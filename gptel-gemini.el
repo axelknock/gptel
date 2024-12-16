@@ -152,7 +152,7 @@
                       prompts)
               (push (list :role "user"
                          :parts
-                         =[(:text ,(gptel--trim-prefixes
+                         `[(:text ,(gptel--trim-prefixes
                                    (funcall get-content 
                                           (prop-match-beginning prop)
                                           (prop-match-end prop))))])
@@ -160,7 +160,7 @@
           (and max-entries (cl-decf max-entries)))
       (push (list :role "user"
                   :parts
-                  =[(:text ,(string-trim (funcall get-content (point-min) (point-max))))])
+                  `[(:text ,(string-trim (funcall get-content (point-min) (point-max))))])
             prompts))
     prompts))
 
