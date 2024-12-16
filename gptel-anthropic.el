@@ -91,45 +91,52 @@
 (cl-defmethod gptel--parse-buffer ((_backend gptel-anthropic) &optional max-entries)
   (let ((prompts) (prop) (prev-pt (point))
         (include-media (and gptel-track-media (or (gptel--model-capable-p 'media)
-                                                (gptel--model-capable-p 'url)))))
+                                                 (gptel--model-capable-p 'url))))
+        (get-content
+         (lambda (beg end)
+           (let ((result "") (pos beg))
+             (while (< pos end)
+               (unless (eq (get-text-property pos 'gptel) 'ignore)
+                 (let ((next (or (next-single-property-change pos 'gptel nil end)
+                                end)))
+                   (setq result (concat result (buffer-substring-no-properties pos next)))
+                   (setq pos next)))
+               (setq pos (or (next-single-property-change pos 'gptel nil end)
+                            end)))
+             result))))
     (if (or gptel-mode gptel-track-response)
         (while (and
                 (or (not max-entries) (>= max-entries 0))
                 (setq prop (text-property-search-backward
-                            'gptel 'response
-                            (when (get-char-property (max (point-min) (1- (point)))
-                                                     'gptel)
-                              t))))
-          ;; HACK Until we can find a more robust solution for editing
-          ;; responses, ignore prompts containing only whitespace, as the
-          ;; Anthropic API can't handle it.  See #452, #409, #406, #351 and #321
-          ;; We check for blank prompts by skipping whitespace and comparing
-          ;; point against the previous.
+                           'gptel 'response
+                           (when (get-char-property (max (point-min) (1- (point)))
+                                                  'gptel)
+                             t))))
           (unless (save-excursion (skip-syntax-forward " ") (>= (point) prev-pt))
             (if (prop-match-value prop) ; assistant role
                 (push (list :role "assistant"
-                            :content
-                            (buffer-substring-no-properties (prop-match-beginning prop)
-                                                            (prop-match-end prop)))
+                           :content
+                           (funcall get-content (prop-match-beginning prop)
+                                  (prop-match-end prop)))
                       prompts)
               (if include-media         ; user role: possibly with media
                   (push (list :role "user"
-                              :content
-                              (gptel--anthropic-parse-multipart
-                               (gptel--parse-media-links
-                                major-mode (prop-match-beginning prop) (prop-match-end prop))))
+                             :content
+                             (gptel--anthropic-parse-multipart
+                              (gptel--parse-media-links
+                               major-mode (prop-match-beginning prop) (prop-match-end prop))))
                         prompts)
                 (push (list :role "user"
-                            :content
-                            (gptel--trim-prefixes
-                             (buffer-substring-no-properties (prop-match-beginning prop)
-                                                             (prop-match-end prop))))
+                           :content
+                           (gptel--trim-prefixes
+                            (funcall get-content (prop-match-beginning prop)
+                                   (prop-match-end prop))))
                       prompts))))
           (setq prev-pt (point))
           (and max-entries (cl-decf max-entries)))
       (push (list :role "user"
                   :content
-                  (string-trim (buffer-substring-no-properties (point-min) (point-max))))
+                  (string-trim (funcall get-content (point-min) (point-max))))
             prompts))
     prompts))
 

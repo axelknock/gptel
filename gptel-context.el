@@ -349,13 +349,22 @@ START and END signify the region delimiters."
 
 (defun gptel-context--string (context-alist)
   "Format the aggregated gptel context as annotated markdown fragments.
-
 Returns a string.  CONTEXT-ALIST is a structure containing
 context overlays, see `gptel-context--alist'."
   (with-temp-buffer
     (cl-loop for (buf . ovs) in context-alist
              if (bufferp buf)
-             do (gptel-context--insert-buffer-string buf ovs)
+             do (let ((pos (point)))
+                  (gptel-context--insert-buffer-string buf ovs)
+                  ;; Remove ignored regions from the inserted text
+                  (let ((end (point)))
+                    (while (< pos end)
+                      (when (eq (get-text-property pos 'gptel) 'ignore)
+                        (delete-region pos 
+                                     (or (next-single-property-change pos 'gptel nil end)
+                                         end)))
+                      (setq pos (or (next-single-property-change pos 'gptel nil end)
+                                  end)))))
              else if (not (plist-get ovs :mime))
              do (gptel-context--insert-file-string buf) end
              do (insert "\n\n")
@@ -366,8 +375,15 @@ context overlays, see `gptel-context--alist'."
                (goto-char (point-min))
                (insert "Request context:\n\n"))
              finally return
-              (and (> (buffer-size) 0)
-                   (buffer-string)))))
+             (and (> (buffer-size) 0)
+                  (buffer-string)))))
+
+(defun gptel-ignore (beg end)
+  "Mark the region from BEG to END to be ignored in gptel prompts."
+  (interactive "r")
+  (when (use-region-p)
+    (put-text-property beg end 'gptel 'ignore)
+    (pulse-momentary-highlight-region beg end)))
 
 ;;; Major mode for context inspection buffers
 (defvar-keymap gptel-context-buffer-mode-map

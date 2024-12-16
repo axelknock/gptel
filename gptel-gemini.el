@@ -116,37 +116,51 @@
 (cl-defmethod gptel--parse-buffer ((_backend gptel-gemini) &optional max-entries)
   (let ((prompts) (prop)
         (include-media (and gptel-track-media (or (gptel--model-capable-p 'media)
-                                                  (gptel--model-capable-p 'url)))))
+                                                 (gptel--model-capable-p 'url))))
+        (get-content
+         (lambda (beg end)
+           (let ((result "") (pos beg))
+             (while (< pos end)
+               (unless (eq (get-text-property pos 'gptel) 'ignore)
+                 (let ((next (or (next-single-property-change pos 'gptel nil end)
+                                end)))
+                   (setq result (concat result (buffer-substring-no-properties pos next)))
+                   (setq pos next)))
+               (setq pos (or (next-single-property-change pos 'gptel nil end)
+                            end)))
+             result))))
     (if (or gptel-mode gptel-track-response)
         (while (and
                 (or (not max-entries) (>= max-entries 0))
                 (setq prop (text-property-search-backward
-                            'gptel 'response
-                            (when (get-char-property (max (point-min) (1- (point)))
-                                                     'gptel)
-                              t))))
+                           'gptel 'response
+                           (when (get-char-property (max (point-min) (1- (point)))
+                                                  'gptel)
+                             t))))
           (if (prop-match-value prop)   ;assistant role
               (push (list :role "model"
-                          :parts
-                          (list :text (buffer-substring-no-properties (prop-match-beginning prop)
-                                                                      (prop-match-end prop))))
+                         :parts
+                         (list :text (funcall get-content 
+                                            (prop-match-beginning prop)
+                                            (prop-match-end prop))))
                     prompts)
             (if include-media
                 (push (list :role "user"
-                            :parts (gptel--gemini-parse-multipart
-                                    (gptel--parse-media-links
-                                     major-mode (prop-match-beginning prop) (prop-match-end prop))))
+                           :parts (gptel--gemini-parse-multipart
+                                 (gptel--parse-media-links
+                                  major-mode (prop-match-beginning prop) (prop-match-end prop))))
                       prompts)
               (push (list :role "user"
-                          :parts
-                          `[(:text ,(gptel--trim-prefixes
-                                     (buffer-substring-no-properties (prop-match-beginning prop)
-                                      (prop-match-end prop))))])
+                         :parts
+                         =[(:text ,(gptel--trim-prefixes
+                                   (funcall get-content 
+                                          (prop-match-beginning prop)
+                                          (prop-match-end prop))))])
                     prompts)))
           (and max-entries (cl-decf max-entries)))
       (push (list :role "user"
                   :parts
-                  `[(:text ,(string-trim (buffer-substring-no-properties (point-min) (point-max))))])
+                  =[(:text ,(string-trim (funcall get-content (point-min) (point-max))))])
             prompts))
     prompts))
 
