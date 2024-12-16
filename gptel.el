@@ -1452,6 +1452,13 @@ BUF defaults to the current buffer."
       (when gptel-mode (gptel--update-status  " Abort" 'error)))
     (message "Stopped gptel request in buffer %S" (buffer-name buf))))
 
+(defun gptel-ignore (beg end)
+  "Mark the region from BEG to END to be ignored in gptel prompts."
+  (interactive "r")
+  (when (use-region-p)
+    (put-text-property beg end 'gptel 'ignore)
+    (pulse-momentary-highlight-region beg end)))
+
 ;; TODO: Handle multiple requests(#15). (Only one request from one buffer at a time?)
 ;;;###autoload
 (defun gptel-send (&optional arg)

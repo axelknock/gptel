@@ -378,13 +378,6 @@ context overlays, see `gptel-context--alist'."
              (and (> (buffer-size) 0)
                   (buffer-string)))))
 
-(defun gptel-ignore (beg end)
-  "Mark the region from BEG to END to be ignored in gptel prompts."
-  (interactive "r")
-  (when (use-region-p)
-    (put-text-property beg end 'gptel 'ignore)
-    (pulse-momentary-highlight-region beg end)))
-
 ;;; Major mode for context inspection buffers
 (defvar-keymap gptel-context-buffer-mode-map
   "C-c C-c" #'gptel-context-confirm
