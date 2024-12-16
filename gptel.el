@@ -870,6 +870,21 @@ Note: This will move the cursor."
    (format "[\t\r\n ]*\\(?:%s\\)?[\t\r\n ]*"
            (regexp-quote (gptel-response-prefix-string)))))
 
+(defun gptel--text-no-property (property)
+  "Return function that returns text between BEG and END that does
+not have text property 'gptel PROPERTY."
+  (lambda (beg end)
+           (let ((result "") (pos beg))
+             (while (< pos end)
+               (unless (eq (get-text-property pos 'gptel) property)
+                 (let ((next (or (next-single-property-change pos 'gptel nil end)
+                                 end)))
+                   (setq result (concat result (buffer-substring-no-properties pos next)))
+                   (setq pos next)))
+               (setq pos (or (next-single-property-change pos 'gptel nil end)
+                             end)))
+             result)))
+
 (defsubst gptel--link-standalone-p (beg end)
   "Return non-nil if positions BEG and END are isolated.
 
